@@ -12,5 +12,13 @@ for all intents and purposes. Magic is currently unable to differentiate between
 as such is **disabled by default**.
 
 ### Changelog
-11/11/22 - Initial Release  
-12/1/22 - Added support for regular combat, attack, and strength potions, and both divine and regular super attack and super strength potions. Added example video to this readme.
+**11/11/22**
+- Initial Release  
+
+**12/1/22**
+- Added support for regular combat, attack, and strength potions, and both divine and regular super attack and super strength potions. 
+- Added example video to this readme.  
+
+**12/13/22** 
+- Added support for defensive magic and ranged attack styles.
+- Check strength boost instead of defense boost when attacking with defensive melee.

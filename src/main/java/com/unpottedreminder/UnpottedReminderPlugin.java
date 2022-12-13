@@ -235,10 +235,10 @@ public class UnpottedReminderPlugin extends Plugin
 		if (client.getGameState() != GameState.LOGGED_IN)
 			return false;
 
-		if (config.enableMagic() && usingDefensiveMagic())
-			return false;
+		if (Skill.DEFENCE.equals(skill))
+			skill = getPrimarySkillForDefensive();
 
-		if (config.enableRanged() && usingDefensiveRanged())
+		if (isSkillDisabled(skill))
 			return false;
 
 		if (!client.isInInstancedRegion() && config.onlyInInstances())
@@ -251,6 +251,28 @@ public class UnpottedReminderPlugin extends Plugin
 			return false;
 
 		return isBoostBelowThreshold(skill);
+	}
+
+	private Skill getPrimarySkillForDefensive() {
+		if (usingDefensiveMagic())
+			return Skill.MAGIC;
+		if (usingDefensiveRanged())
+			return Skill.RANGED;
+		return Skill.STRENGTH;
+	}
+
+	private boolean isSkillDisabled(Skill skill) {
+		switch (skill) {
+			case MAGIC:
+				return !config.enableMagic();
+			case RANGED:
+				return !config.enableRanged();
+			case ATTACK:
+			case STRENGTH:
+				return !config.enableMelee();
+			default:
+				return true;
+		}
 	}
 
 	private boolean interactingShouldAlert() {
@@ -284,7 +306,8 @@ public class UnpottedReminderPlugin extends Plugin
 				&& Arrays.stream(playerItems).anyMatch(item -> MAGIC_POTIONS.contains(item.getId())))
 			return true;
 
-		return Arrays.stream(playerItems).anyMatch(item -> OVERLOADS.contains(item.getId()));
+		return (config.enableMelee() || config.enableRanged() || config.enableMagic())
+				&& Arrays.stream(playerItems).anyMatch(item -> OVERLOADS.contains(item.getId()));
 	}
 
 	private boolean isBoostBelowThreshold(Skill skill)
