@@ -253,7 +253,8 @@ public class UnpottedReminderPlugin extends Plugin
 		return isBoostBelowThreshold(skill);
 	}
 
-	private Skill getPrimarySkillForDefensive() {
+	private Skill getPrimarySkillForDefensive()
+	{
 		if (usingDefensiveMagic())
 			return Skill.MAGIC;
 		if (usingDefensiveRanged())
@@ -261,8 +262,10 @@ public class UnpottedReminderPlugin extends Plugin
 		return Skill.STRENGTH;
 	}
 
-	private boolean isSkillDisabled(Skill skill) {
-		switch (skill) {
+	private boolean isSkillDisabled(Skill skill)
+	{
+		switch (skill)
+		{
 			case MAGIC:
 				return !config.enableMagic();
 			case RANGED:
@@ -275,7 +278,8 @@ public class UnpottedReminderPlugin extends Plugin
 		}
 	}
 
-	private boolean interactingShouldAlert() {
+	private boolean interactingShouldAlert()
+	{
 		String interactingName = client.getLocalPlayer().getInteracting() != null
 				? client.getLocalPlayer().getInteracting().getName() : null;
 
