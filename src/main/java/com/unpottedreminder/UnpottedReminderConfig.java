@@ -179,11 +179,23 @@ public interface UnpottedReminderConfig extends Config
 		return false;
 	}
 
+	@Units(Units.SECONDS)
+	@ConfigItem(
+			keyName = "notifyCooldown",
+			name = "Notify Cooldown",
+			description = "Seconds until notifier can be triggered again (0 to disable)",
+			position = 14
+	)
+	default int notifyCooldown()
+	{
+		return 5;
+	}
+
 	@ConfigItem(
 			keyName = "useWhitelist",
 			name = "Enable NPC whitelist",
 			description = "Whether or not to only alert when attacking NPCs in the list below (comma-separated)",
-			position = 14
+			position = 15
 	)
 	default boolean useWhitelist()
 	{
@@ -194,7 +206,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "whitelist",
 			name = "NPC Whitelist",
 			description = "Only alert when attacking NPCs in this comma-separated list when toggled above (supports wildcards)",
-			position = 15
+			position = 16
 	)
 	default String whitelist()
 	{
@@ -205,7 +217,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "useBlacklist",
 			name = "Enable NPC blacklist",
 			description = "Whether or not to alert when attacking NPCs in the list below (comma-separated)",
-			position = 16
+			position = 17
 	)
 	default boolean useBlacklist()
 	{
@@ -216,7 +228,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "blacklist",
 			name = "NPC Blacklist",
 			description = "Don't alert when attacking NPCs in this comma-separated list when toggled above (supports wildcards)",
-			position = 17
+			position = 18
 	)
 	default String blacklist()
 	{
@@ -227,7 +239,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "alertWhenNotInteracting",
 			name = "Alert when not targeting any NPC",
 			description = "Whether or not to alert when you are not interacting with an NPC",
-			position = 18
+			position = 19
 	)
 	default boolean alertWhenNotInteracting()
 	{
@@ -238,7 +250,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "onlyInInstances",
 			name = "Only alert in instances",
 			description = "Whether or not to only alert when you are in an instanced area in-game",
-			position = 19
+			position = 20
 	)
 	default boolean onlyInInstances()
 	{

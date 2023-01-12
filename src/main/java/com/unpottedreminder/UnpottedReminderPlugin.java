@@ -44,6 +44,8 @@ import net.runelite.client.util.WildcardMatcher;
 import javax.inject.Inject;
 import java.time.Instant;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @PluginDescriptor(
@@ -78,6 +80,15 @@ public class UnpottedReminderPlugin extends Plugin
 	private List<String> whitelisted = new ArrayList<>();
 
 	private Instant alertStart;
+	private Instant lastNotify;
+
+	// Credit to github.com/JuliusAF for most Imbued Heart tracking logic which I have modified slightly.
+	private int invigorateTick;
+	private int remainingDuration;
+	private static final int IMBUED_HEART_DURATION_TICKS = 700;
+	private static final String IMBUED_HEART_READY_MESSAGE = "Your imbued heart has regained its magical power.";
+	private static final Pattern IMBUED_HEART_BUSY_MESSAGE = Pattern.compile("The heart is still drained of its power. Judging by how it feels, it will be ready in around (\\d+) (\\w+)\\.");
+	private static final int IMBUED_HEART_GRAPHIC = 1316;
 
 	private static final List<Integer> MELEE_POTIONS = ImmutableList.of(
 			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
@@ -98,7 +109,7 @@ public class UnpottedReminderPlugin extends Plugin
 
 	private static final List<Integer> MAGIC_POTIONS = ImmutableList.of(
 			ItemID.MAGIC_POTION4, ItemID.MAGIC_POTION3, ItemID.MAGIC_POTION4,
-			ItemID.BATTLEMAGE_POTION4, ItemID.BATTLEMAGE_POTION3, ItemID.BATTLEMAGE_POTION2, ItemID.BATTLEMAGE_POTION1, ItemID.IMBUED_HEART);
+			ItemID.BATTLEMAGE_POTION4, ItemID.BATTLEMAGE_POTION3, ItemID.BATTLEMAGE_POTION2, ItemID.BATTLEMAGE_POTION1);
 	private static final List<Integer> OVERLOADS = ImmutableList.of(
 			ItemID.SMELLING_SALTS_2, ItemID.SMELLING_SALTS_1,
 			ItemID.OVERLOAD_4, ItemID.OVERLOAD_3, ItemID.OVERLOAD_2, ItemID.OVERLOAD_1,
@@ -124,6 +135,9 @@ public class UnpottedReminderPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		invigorateTick = -1;
+		remainingDuration = 0;
+
 		blacklisted = splitList(config.blacklist());
 		whitelisted = splitList(config.whitelist());
 
@@ -151,6 +165,8 @@ public class UnpottedReminderPlugin extends Plugin
 		playerItems = null;
 		alertStart = null;
 		playerExperience.clear();
+		invigorateTick = -1;
+		remainingDuration = 0;
 		overlayManager.remove(overlay);
 	}
 
@@ -195,26 +211,22 @@ public class UnpottedReminderPlugin extends Plugin
 
 		if (shouldAlert(skill))
 		{
-			alertStart = Instant.now();
-
-			if (config.showOverlay())
-				overlayManager.add(overlay);
-
-			if (config.shouldNotify())
-				notifier.notify("You need to drink your boost potion!");
+			alert();
 		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (null == alertStart)
-			return;
-
-		if (Instant.now().minusSeconds(config.timeout()).isAfter(alertStart))
+		if (invigorateTick > 0 && client.getTickCount() > invigorateTick + remainingDuration)
 		{
-			overlayManager.remove(overlay);
-			alertStart = null;
+			invigorateTick = -1;
+			remainingDuration = 0;
+		}
+
+		if (null != alertStart && Instant.now().minusSeconds(config.timeout()).isAfter(alertStart))
+		{
+			clearAlert();
 		}
 	}
 
@@ -225,9 +237,63 @@ public class UnpottedReminderPlugin extends Plugin
 
 		if (msg.contains("You drink some of your"))
 		{
-			overlayManager.remove(overlay);
-			alertStart = null;
+			clearAlert();
 		}
+
+		if (msg.equals(IMBUED_HEART_READY_MESSAGE))
+		{
+			invigorateTick = -1;
+			remainingDuration = 0;
+		}
+
+		Matcher heartBusy = IMBUED_HEART_BUSY_MESSAGE.matcher(msg);
+		if (heartBusy.find())
+		{
+			if (heartBusy.group(2).startsWith("minute"))
+			{
+				remainingDuration = (int) ((Integer.parseInt(heartBusy.group(1)) * 60) / 0.6);
+			}
+			else if (heartBusy.group(2).startsWith("second"))
+			{
+				remainingDuration = (int) (Integer.parseInt(heartBusy.group(1)) / 0.6);
+			}
+			invigorateTick = client.getTickCount();
+		}
+	}
+
+	@Subscribe
+	public void onGraphicChanged(GraphicChanged event)
+	{
+		if ((event.getActor().getGraphic() == IMBUED_HEART_GRAPHIC) && Objects.equals(event.getActor().getName(), client.getLocalPlayer().getName()))
+		{
+			invigorateTick = client.getTickCount();
+			remainingDuration = IMBUED_HEART_DURATION_TICKS;
+
+			clearAlert();
+		}
+	}
+
+	private void alert()
+	{
+		boolean shouldNotify = (config.shouldNotify()
+				&& (null == lastNotify || Instant.now().minusSeconds(config.notifyCooldown()).isAfter(lastNotify)));
+
+		alertStart = Instant.now();
+
+		if (config.showOverlay())
+			overlayManager.add(overlay);
+
+		if (shouldNotify)
+		{
+			notifier.notify("You need to drink your boost potion!");
+			lastNotify = Instant.now();
+		}
+	}
+
+	private void clearAlert()
+	{
+		overlayManager.remove(overlay);
+		alertStart = null;
 	}
 
 	private boolean shouldAlert(Skill skill)
@@ -298,6 +364,8 @@ public class UnpottedReminderPlugin extends Plugin
 
 	private boolean hasBoostPotionInInventory(Skill skill)
 	{
+		boolean heartReady = invigorateTick <= 0;
+
 		if (MELEE_SKILLS.contains(skill) && config.enableMelee()
 				&& Arrays.stream(playerItems).anyMatch(item -> MELEE_POTIONS.contains(item.getId())))
 			return true;
@@ -307,7 +375,7 @@ public class UnpottedReminderPlugin extends Plugin
 			return true;
 
 		if (Skill.MAGIC == skill && config.enableMagic()
-				&& Arrays.stream(playerItems).anyMatch(item -> MAGIC_POTIONS.contains(item.getId())))
+				&& Arrays.stream(playerItems).anyMatch(item -> ((item.getId() == ItemID.IMBUED_HEART && heartReady) || MAGIC_POTIONS.contains(item.getId()))))
 			return true;
 
 		return (config.enableMelee() || config.enableRanged() || config.enableMagic())
