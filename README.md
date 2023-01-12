@@ -1,5 +1,4 @@
 # Unpotted Reminder
-![Example video showing a player attacking a Rock crab with an overlay alerting the player to drink their boost potion](https://imgur.com/ooATcAp.gif)
 
 ### Description
 This plugin reminds you to drink your boost potions when you are in combat and have a boost potion in your inventory. 
@@ -22,3 +21,7 @@ as such is **disabled by default**.
 **12/13/22** 
 - Added support for defensive magic and ranged attack styles.
 - Check strength boost instead of defense boost when attacking with defensive melee.
+
+**1/12/23**
+- Added optional cooldown for notifier.
+- Only alert for imbued heart when it is actually available. Credit to JuliusAF on GitHub for most of this logic.
