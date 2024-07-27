@@ -25,3 +25,11 @@ as such is **disabled by default**.
 **1/12/23**
 - Added optional cooldown for notifier.
 - Only alert for imbued heart when it is actually available. Credit to JuliusAF on GitHub for most of this logic.
+
+**7/27/24**
+- Add new options for which style to check the boost for when using melee. You can choose between strength only or both 
+attack and strength. Defense boost is effectively no longer being checked.
+- Add saturated heart and fix the logic that determines if your imbued or saturated heart is available.
+- Add Divine magic potions.
+- Fix longrange on Tumeken's shadow, which was incorrectly tracking as melee.
+- Fix issue where sipping potions or using smelling salts in TOA caused an alert or failed to clear an existing one

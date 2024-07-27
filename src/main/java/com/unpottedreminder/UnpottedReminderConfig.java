@@ -44,10 +44,21 @@ public interface UnpottedReminderConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "meleeAlertStyle",
+			name = "Melee Alert Style",
+			description = "Which attack style boost will alert you when using melee",
+			position = 2
+	)
+	default MeleeAlertStyle meleeAlertStyle()
+	{
+		return MeleeAlertStyle.ATTACK_AND_STRENGTH;
+	}
+
+	@ConfigItem(
 			keyName = "enableRanged",
 			name = "Alert for Ranged",
 			description = "Whether or not the warning should display when attacking with ranged",
-			position = 2
+			position = 3
 	)
 	default boolean enableRanged()
 	{
@@ -58,7 +69,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "enableMagic",
 			name = "Alert for Magic",
 			description = "Whether or not the warning should display when attacking with magic",
-			position = 3
+			position = 4
 	)
 	default boolean enableMagic()
 	{
@@ -70,7 +81,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "meleeBoostThreshold",
 			name = "Melee Boost Threshold",
 			description = "Don't alert when melee stats are boosted above this amount",
-			position = 4
+			position = 5
 	)
 	default int meleeBoostThreshold()
 	{
@@ -81,7 +92,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "rangedBoostThreshold",
 			name = "Ranged Boost Threshold",
 			description = "Don't alert when ranged stats are boosted above this amount",
-			position = 5
+			position = 6
 	)
 	default int rangedBoostThreshold()
 	{
@@ -92,7 +103,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "magicBoostThreshold",
 			name = "Magic Boost Threshold",
 			description = "Don't alert when magic stats are boosted above this amount",
-			position = 6
+			position = 7
 	)
 	default int magicBoostThreshold()
 	{
@@ -103,7 +114,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "timeout",
 			name = "Timeout",
 			description = "Stop showing warning after this long in seconds (unless triggered again)",
-			position = 7
+			position = 8
 	)
 	@Units(Units.SECONDS)
 	default int timeout()
@@ -115,7 +126,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "experienceThreshold",
 			name = "Xp Threshold",
 			description = "Don't alert when xp drop is more than this amount (0 to disable)",
-			position = 8
+			position = 9
 	)
 	default int experienceThreshold()
 	{
@@ -126,7 +137,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "shouldFlash",
 			name = "Flash overlay",
 			description = "Whether or not the overlay should flash colors",
-			position = 9
+			position = 10
 	)
 	default boolean shouldFlash()
 	{
@@ -138,7 +149,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "flashColor1",
 			name = "Flash color 1",
 			description = "First color to flash between if 'Flash overlay' is on",
-			position = 10
+			position = 11
 	)
 	default Color flashColor1()
 	{
@@ -150,7 +161,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "flashColor2",
 			name = "Flash color 2",
 			description = "Second color to flash between if 'Flash overlay' is on",
-			position = 11
+			position = 12
 	)
 	default Color flashColor2()
 	{
@@ -161,7 +172,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "showOverlay",
 			name = "Show overlay",
 			description = "Whether or not to show the overlay when warning you to pot",
-			position = 12
+			position = 13
 	)
 	default boolean showOverlay()
 	{
@@ -172,7 +183,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "shouldNotify",
 			name = "Notify",
 			description = "Whether or not to notify you when warning you to pot",
-			position = 13
+			position = 14
 	)
 	default boolean shouldNotify()
 	{
@@ -184,7 +195,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "notifyCooldown",
 			name = "Notify Cooldown",
 			description = "Seconds until notifier can be triggered again (0 to disable)",
-			position = 14
+			position = 15
 	)
 	default int notifyCooldown()
 	{
@@ -195,7 +206,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "useWhitelist",
 			name = "Enable NPC whitelist",
 			description = "Whether or not to only alert when attacking NPCs in the list below (comma-separated)",
-			position = 15
+			position = 16
 	)
 	default boolean useWhitelist()
 	{
@@ -206,7 +217,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "whitelist",
 			name = "NPC Whitelist",
 			description = "Only alert when attacking NPCs in this comma-separated list when toggled above (supports wildcards)",
-			position = 16
+			position = 17
 	)
 	default String whitelist()
 	{
@@ -217,7 +228,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "useBlacklist",
 			name = "Enable NPC blacklist",
 			description = "Whether or not to alert when attacking NPCs in the list below (comma-separated)",
-			position = 17
+			position = 18
 	)
 	default boolean useBlacklist()
 	{
@@ -228,7 +239,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "blacklist",
 			name = "NPC Blacklist",
 			description = "Don't alert when attacking NPCs in this comma-separated list when toggled above (supports wildcards)",
-			position = 18
+			position = 19
 	)
 	default String blacklist()
 	{
@@ -239,7 +250,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "alertWhenNotInteracting",
 			name = "Alert when not targeting any NPC",
 			description = "Whether or not to alert when you are not interacting with an NPC",
-			position = 19
+			position = 20
 	)
 	default boolean alertWhenNotInteracting()
 	{
@@ -250,7 +261,7 @@ public interface UnpottedReminderConfig extends Config
 			keyName = "onlyInInstances",
 			name = "Only alert in instances",
 			description = "Whether or not to only alert when you are in an instanced area in-game",
-			position = 20
+			position = 21
 	)
 	default boolean onlyInInstances()
 	{
