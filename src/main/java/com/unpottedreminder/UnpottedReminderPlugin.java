@@ -25,7 +25,6 @@
  */
 package com.unpottedreminder;
 
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
@@ -44,8 +43,6 @@ import net.runelite.client.util.WildcardMatcher;
 import javax.inject.Inject;
 import java.time.Instant;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @PluginDescriptor(
@@ -81,16 +78,20 @@ public class UnpottedReminderPlugin extends Plugin
 
 	private Instant alertStart;
 	private Instant lastNotify;
-
-	// Credit to github.com/JuliusAF for most Imbued Heart tracking logic which I have modified slightly.
-	private int invigorateTick;
-	private int remainingDuration;
-	private static final int IMBUED_HEART_DURATION_TICKS = 700;
-	private static final String IMBUED_HEART_READY_MESSAGE = "Your imbued heart has regained its magical power.";
-	private static final Pattern IMBUED_HEART_BUSY_MESSAGE = Pattern.compile("The heart is still drained of its power. Judging by how it feels, it will be ready in around (\\d+) (\\w+)\\.");
+	private int potionLastDrankGameCycle;
+	
 	private static final int IMBUED_HEART_GRAPHIC = 1316;
+	private static final int SATURATED_HEART_GRAPHIC = 2287;
 
-	private static final List<Integer> MELEE_POTIONS = ImmutableList.of(
+	private static final List<Integer> DEFENSIVE_CASTING_WEAPONTYPES = List.of(18, 21);
+	private static final List<Integer> RANGED_WEAPONTYPES = List.of(3, 5, 6, 7, 19);
+	private static final List<Integer> POWERED_STAFF_WEAPONTYPES = List.of(23, 24);
+	private static final Integer ATTACK_STYLE_DEFENSIVE = 3;
+
+	private static final List<Skill> MELEE_SKILLS = List.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE);
+	private final List<Skill> trackedSkills = List.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.MAGIC);
+
+	public static final List<Integer> MELEE_POTIONS = List.of(
 			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
 			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
 			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
@@ -101,27 +102,37 @@ public class UnpottedReminderPlugin extends Plugin
 			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
 			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
 
-	private static final List<Integer> RANGED_POTIONS = ImmutableList.of(
+	public static final List<Integer> ATTACK_POTIONS = List.of(
+			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
+			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
+			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
+			ItemID.ATTACK_POTION4, ItemID.ATTACK_POTION3,ItemID.ATTACK_POTION2,ItemID.ATTACK_POTION1,
+			ItemID.SUPER_ATTACK4, ItemID.SUPER_ATTACK3, ItemID.SUPER_ATTACK2, ItemID.SUPER_ATTACK1,
+			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1);
+
+	public static final List<Integer> STRENGTH_POTIONS = List.of(
+			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
+			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
+			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
+			ItemID.STRENGTH_POTION4, ItemID.STRENGTH_POTION3,ItemID.STRENGTH_POTION2,ItemID.STRENGTH_POTION1,
+			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
+			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
+
+	public static final List<Integer> RANGED_POTIONS = List.of(
 			ItemID.RANGING_POTION4, ItemID.RANGING_POTION3, ItemID.RANGING_POTION2, ItemID.RANGING_POTION1,
 			ItemID.DIVINE_RANGING_POTION4, ItemID.DIVINE_RANGING_POTION3, ItemID.DIVINE_RANGING_POTION2, ItemID.DIVINE_RANGING_POTION1,
 			ItemID.BASTION_POTION4, ItemID.BASTION_POTION3, ItemID.BASTION_POTION2, ItemID.BASTION_POTION1,
 			ItemID.DIVINE_BASTION_POTION4, ItemID.DIVINE_BASTION_POTION3, ItemID.DIVINE_BASTION_POTION2, ItemID.DIVINE_BASTION_POTION1);
 
-	private static final List<Integer> MAGIC_POTIONS = ImmutableList.of(
+	public static final List<Integer> MAGIC_POTIONS = List.of(
 			ItemID.MAGIC_POTION4, ItemID.MAGIC_POTION3, ItemID.MAGIC_POTION4,
-			ItemID.BATTLEMAGE_POTION4, ItemID.BATTLEMAGE_POTION3, ItemID.BATTLEMAGE_POTION2, ItemID.BATTLEMAGE_POTION1);
-	private static final List<Integer> OVERLOADS = ImmutableList.of(
+			ItemID.BATTLEMAGE_POTION4, ItemID.BATTLEMAGE_POTION3, ItemID.BATTLEMAGE_POTION2, ItemID.BATTLEMAGE_POTION1,
+			ItemID.DIVINE_MAGIC_POTION4, ItemID.DIVINE_MAGIC_POTION3, ItemID.DIVINE_MAGIC_POTION2, ItemID.DIVINE_MAGIC_POTION1);
+
+	public static final List<Integer> OVERLOADS = List.of(
 			ItemID.SMELLING_SALTS_2, ItemID.SMELLING_SALTS_1,
 			ItemID.OVERLOAD_4, ItemID.OVERLOAD_3, ItemID.OVERLOAD_2, ItemID.OVERLOAD_1,
 			ItemID.OVERLOAD_4_20996, ItemID.OVERLOAD_3_20995, ItemID.OVERLOAD_2_20994, ItemID.OVERLOAD_1_20993);
-
-	private static final List<Integer> DEFENSIVE_CASTING_WEAPONTYPES = ImmutableList.of(18, 21);
-	private static final List<Integer> RANGED_WEAPONTYPES = ImmutableList.of(3, 5, 6, 7, 19);
-	private static final Integer POWERED_STAFF_WEAPONTYPE = 23;
-	private static final Integer ATTACK_STYLE_DEFENSIVE = 3;
-
-	private static final List<Skill> MELEE_SKILLS = ImmutableList.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE);
-	private final List<Skill> trackedSkills = ImmutableList.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.MAGIC);
 
 	private final EnumMap<Skill, Integer> playerExperience = new EnumMap<>(Skill.class);
 	private final EnumMap<Skill, Integer> playerBoosts = new EnumMap<>(Skill.class);
@@ -135,9 +146,6 @@ public class UnpottedReminderPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		invigorateTick = -1;
-		remainingDuration = 0;
-
 		blacklisted = splitList(config.blacklist());
 		whitelisted = splitList(config.whitelist());
 
@@ -165,8 +173,6 @@ public class UnpottedReminderPlugin extends Plugin
 		playerItems = null;
 		alertStart = null;
 		playerExperience.clear();
-		invigorateTick = -1;
-		remainingDuration = 0;
 		overlayManager.remove(overlay);
 	}
 
@@ -209,6 +215,9 @@ public class UnpottedReminderPlugin extends Plugin
 		if (config.experienceThreshold() > 0 && xpDiff > config.experienceThreshold())
 			return;
 
+		if (client.getGameCycle() == potionLastDrankGameCycle)
+			return;
+
 		if (shouldAlert(skill))
 		{
 			alert();
@@ -218,12 +227,6 @@ public class UnpottedReminderPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (invigorateTick > 0 && client.getTickCount() > invigorateTick + remainingDuration)
-		{
-			invigorateTick = -1;
-			remainingDuration = 0;
-		}
-
 		if (null != alertStart && Instant.now().minusSeconds(config.timeout()).isAfter(alertStart))
 		{
 			clearAlert();
@@ -235,40 +238,19 @@ public class UnpottedReminderPlugin extends Plugin
 	{
 		String msg = Text.removeTags(event.getMessage());
 
-		if (msg.contains("You drink some of your"))
+		if (msg.contains("You drink some of your") || msg.contains("You crush the salts"))
 		{
+			potionLastDrankGameCycle = client.getGameCycle();
 			clearAlert();
-		}
-
-		if (msg.equals(IMBUED_HEART_READY_MESSAGE))
-		{
-			invigorateTick = -1;
-			remainingDuration = 0;
-		}
-
-		Matcher heartBusy = IMBUED_HEART_BUSY_MESSAGE.matcher(msg);
-		if (heartBusy.find())
-		{
-			if (heartBusy.group(2).startsWith("minute"))
-			{
-				remainingDuration = (int) ((Integer.parseInt(heartBusy.group(1)) * 60) / 0.6);
-			}
-			else if (heartBusy.group(2).startsWith("second"))
-			{
-				remainingDuration = (int) (Integer.parseInt(heartBusy.group(1)) / 0.6);
-			}
-			invigorateTick = client.getTickCount();
 		}
 	}
 
 	@Subscribe
 	public void onGraphicChanged(GraphicChanged event)
 	{
-		if ((event.getActor().getGraphic() == IMBUED_HEART_GRAPHIC) && Objects.equals(event.getActor().getName(), client.getLocalPlayer().getName()))
+		if ((event.getActor().hasSpotAnim(IMBUED_HEART_GRAPHIC) ||  event.getActor().hasSpotAnim(SATURATED_HEART_GRAPHIC))
+				&& Objects.equals(event.getActor().getName(), client.getLocalPlayer().getName()))
 		{
-			invigorateTick = client.getTickCount();
-			remainingDuration = IMBUED_HEART_DURATION_TICKS;
-
 			clearAlert();
 		}
 	}
@@ -364,28 +346,41 @@ public class UnpottedReminderPlugin extends Plugin
 
 	private boolean hasBoostPotionInInventory(Skill skill)
 	{
-		boolean heartReady = invigorateTick <= 0;
-
-		if (MELEE_SKILLS.contains(skill) && config.enableMelee()
-				&& Arrays.stream(playerItems).anyMatch(item -> MELEE_POTIONS.contains(item.getId())))
+		if (MELEE_SKILLS.contains(skill) && config.enableMelee() && hasMeleePotion(skill))
 			return true;
 
 		if (Skill.RANGED == skill && config.enableRanged()
 				&& Arrays.stream(playerItems).anyMatch(item -> RANGED_POTIONS.contains(item.getId())))
 			return true;
 
-		if (Skill.MAGIC == skill && config.enableMagic()
-				&& Arrays.stream(playerItems).anyMatch(item -> ((item.getId() == ItemID.IMBUED_HEART && heartReady) || MAGIC_POTIONS.contains(item.getId()))))
+		if (Skill.MAGIC == skill && config.enableMagic() && Arrays.stream(playerItems).anyMatch(item ->
+				(((item.getId() == ItemID.IMBUED_HEART || item.getId() == ItemID.SATURATED_HEART) && isHeartAvailable())
+						|| MAGIC_POTIONS.contains(item.getId()))))
 			return true;
 
 		return (config.enableMelee() || config.enableRanged() || config.enableMagic())
 				&& Arrays.stream(playerItems).anyMatch(item -> OVERLOADS.contains(item.getId()));
 	}
 
+	private boolean isHeartAvailable()
+	{
+		return client.getVarbitValue(Varbits.IMBUED_HEART_COOLDOWN) == 0;
+	}
+
+	private boolean hasMeleePotion(Skill skill)
+	{
+		if (skill == Skill.ATTACK)
+			return Arrays.stream(playerItems).anyMatch(item -> ATTACK_POTIONS.contains(item.getId()));
+
+		if (skill == Skill.STRENGTH)
+			return Arrays.stream(playerItems).anyMatch(item -> STRENGTH_POTIONS.contains(item.getId()));
+
+		return false;
+	}
+
 	private boolean isBoostBelowThreshold(Skill skill)
 	{
-		if (MELEE_SKILLS.contains(skill) && config.enableMelee()
-				&& playerBoosts.getOrDefault(skill, -1) <= config.meleeBoostThreshold())
+		if (MELEE_SKILLS.contains(skill) && config.enableMelee() && isMeleeBoostBelowThreshold(skill))
 			return true;
 
 		if (Skill.RANGED == skill && config.enableRanged()
@@ -396,14 +391,31 @@ public class UnpottedReminderPlugin extends Plugin
 				&& playerBoosts.getOrDefault(Skill.MAGIC, -1) <= config.magicBoostThreshold());
 	}
 
+	private boolean isMeleeBoostBelowThreshold(Skill skill)
+	{
+		if (Skill.STRENGTH == skill)
+		{
+			return playerBoosts.getOrDefault(Skill.STRENGTH, -1) <= config.meleeBoostThreshold();
+		}
+
+		if (Skill.ATTACK == skill && (config.meleeAlertStyle() == MeleeAlertStyle.ATTACK_AND_STRENGTH))
+		{
+			return playerBoosts.getOrDefault(Skill.ATTACK, -1) <= config.meleeBoostThreshold();
+		}
+
+		return false;
+	}
+
 	private boolean usingDefensiveMagic()
 	{
 		int defensiveCasting = client.getVarbitValue(Varbits.DEFENSIVE_CASTING_MODE);
 		int currentAttackStyleVarbit = client.getVarpValue(VarPlayer.ATTACK_STYLE);
 		int equippedWeaponTypeVarbit = client.getVarbitValue(Varbits.EQUIPPED_WEAPON_TYPE);
 
-		if (POWERED_STAFF_WEAPONTYPE == equippedWeaponTypeVarbit && ATTACK_STYLE_DEFENSIVE == currentAttackStyleVarbit)
+		if (POWERED_STAFF_WEAPONTYPES.contains(equippedWeaponTypeVarbit) && ATTACK_STYLE_DEFENSIVE == currentAttackStyleVarbit)
+		{
 			return true;
+		}
 
 		return (DEFENSIVE_CASTING_WEAPONTYPES.contains(equippedWeaponTypeVarbit) && defensiveCasting == 1);
 	}
