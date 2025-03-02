@@ -52,8 +52,9 @@ class UnpottedReminderOverlay extends OverlayPanel
 		panelComponent.getChildren().clear();
 
 		panelComponent.getChildren().add((LineComponent.builder())
-				.left("You need to drink your boost potion!")
-				.build());
+            .left(config.overlayText().isEmpty() ?
+                "You need to drink your boost potion!" : config.overlayText())
+            .build());
 
 		if (config.shouldFlash())
 		{
