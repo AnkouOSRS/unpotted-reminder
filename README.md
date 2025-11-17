@@ -37,4 +37,4 @@ attack and strength. Defense boost is effectively no longer being checked.
 **11/16/25**
 - Add support for tracking combat stats on seperate overlays
 - Add support for custom overlay + notification text
-- Add support for new Brews
+- Add support for new Brews + Moonlight potions
