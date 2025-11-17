@@ -1,9 +1,13 @@
+*.sublime*
+.classpath
+.DS_Store
+.factorypath
 .gradle
-build
 .idea/
 .project
 .settings/
-.classpath
-nbactions.xml
+bin/
+build
 nb-configuration.xml
+nbactions.xml
 nbproject/

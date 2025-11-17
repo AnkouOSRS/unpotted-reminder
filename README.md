@@ -33,3 +33,8 @@ attack and strength. Defense boost is effectively no longer being checked.
 - Add Divine magic potions.
 - Fix longrange on Tumeken's shadow, which was incorrectly tracking as melee.
 - Fix issue where sipping potions or using smelling salts in TOA caused an alert or failed to clear an existing one
+
+**11/16/25**
+- Add support for tracking combat stats on seperate overlays
+- Add support for custom overlay + notification text
+- Add support for new Brews + Moonlight potions
