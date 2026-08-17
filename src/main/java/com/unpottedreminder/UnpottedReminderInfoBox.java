@@ -56,6 +56,6 @@ class UnpottedReminderInfoBox extends InfoBox
 	@Override
 	public String getTooltip()
 	{
-		return config.alertMessage();
+		return UnpottedReminderPlugin.resolveAlertMessage(config);
 	}
 }

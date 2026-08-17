@@ -33,3 +33,10 @@ attack and strength. Defense boost is effectively no longer being checked.
 - Add Divine magic potions.
 - Fix longrange on Tumeken's shadow, which was incorrectly tracking as melee.
 - Fix issue where sipping potions or using smelling salts in TOA caused an alert or failed to clear an existing one
+
+**8/17/26**
+- Add the option to set custom alert text.
+- Add the option to replace the overlay text with an empty vial icon.
+- Add an option to replace the overlay with an infobox.
+- Add support for Ancient brew, Forgotten brew, Armadyl brew, and Divine battlemage potions, and fix magic potion tracking to check all four doses.
+- Migrate item lookups off RuneLite's deprecated `ItemID` class.

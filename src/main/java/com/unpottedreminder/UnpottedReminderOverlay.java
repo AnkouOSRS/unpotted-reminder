@@ -25,8 +25,8 @@
  */
 package com.unpottedreminder;
 
-import net.runelite.api.ItemID;
 import net.runelite.api.Client;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -50,7 +50,7 @@ class UnpottedReminderOverlay extends OverlayPanel
 	{
 		this.client = client;
 		this.config = config;
-		this.vialImage = itemManager.getImage(ItemID.VIAL);
+		this.vialImage = itemManager.getImage(ItemID.VIAL_EMPTY);
 	}
 
 	@Override
@@ -66,10 +66,11 @@ class UnpottedReminderOverlay extends OverlayPanel
 		}
 		else
 		{
+			String alertMessage = UnpottedReminderPlugin.resolveAlertMessage(config);
 			panelComponent.getChildren().add((LineComponent.builder())
-					.left(config.alertMessage())
+					.left(alertMessage)
 					.build());
-			contentWidth = graphics.getFontMetrics().stringWidth(config.alertMessage());
+			contentWidth = graphics.getFontMetrics().stringWidth(alertMessage);
 		}
 
 		panelComponent.setPreferredSize(new Dimension(contentWidth + 2 * ComponentConstants.STANDARD_BORDER, 0));

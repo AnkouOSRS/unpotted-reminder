@@ -287,7 +287,7 @@ public interface UnpottedReminderConfig extends Config
 	)
 	default String alertMessage()
 	{
-		return "You need to drink your boost potion!";
+		return "Drink a boost potion!";
 	}
 
 	@ConfigItem(
