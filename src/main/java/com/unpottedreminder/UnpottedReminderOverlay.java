@@ -25,10 +25,15 @@
  */
 package com.unpottedreminder;
 
+import net.runelite.api.ItemID;
 import net.runelite.api.Client;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.ComponentConstants;
+import net.runelite.client.ui.overlay.components.ImageComponent;
 import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.util.AsyncBufferedImage;
 
 import javax.inject.Inject;
 import java.awt.*;
@@ -38,12 +43,14 @@ class UnpottedReminderOverlay extends OverlayPanel
 {
 	private final Client client;
 	private final UnpottedReminderConfig config;
+	private final AsyncBufferedImage vialImage;
 
 	@Inject
-	private UnpottedReminderOverlay(Client client, UnpottedReminderConfig config)
+	private UnpottedReminderOverlay(Client client, UnpottedReminderConfig config, ItemManager itemManager)
 	{
 		this.client = client;
 		this.config = config;
+		this.vialImage = itemManager.getImage(ItemID.VIAL);
 	}
 
 	@Override
@@ -51,9 +58,21 @@ class UnpottedReminderOverlay extends OverlayPanel
 	{
 		panelComponent.getChildren().clear();
 
-		panelComponent.getChildren().add((LineComponent.builder())
-				.left("You need to drink your boost potion!")
-				.build());
+		int contentWidth;
+		if (config.useVialIcon())
+		{
+			panelComponent.getChildren().add(new ImageComponent(vialImage));
+			contentWidth = vialImage.getWidth();
+		}
+		else
+		{
+			panelComponent.getChildren().add((LineComponent.builder())
+					.left(config.alertMessage())
+					.build());
+			contentWidth = graphics.getFontMetrics().stringWidth(config.alertMessage());
+		}
+
+		panelComponent.setPreferredSize(new Dimension(contentWidth + 2 * ComponentConstants.STANDARD_BORDER, 0));
 
 		if (config.shouldFlash())
 		{

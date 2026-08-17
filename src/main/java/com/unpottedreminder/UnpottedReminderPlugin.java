@@ -34,9 +34,11 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.util.Text;
 import net.runelite.client.util.WildcardMatcher;
 
@@ -48,7 +50,7 @@ import java.util.stream.Collectors;
 @PluginDescriptor(
 	name = "Unpotted Reminder",
 	description = "Reminds you you're unpotted in combat when you have one in your inventory",
-	tags = {"combat", "potion", "reminder", "overlay", "pvm", "alert"}
+	tags = {"combat", "potion", "reminder", "overlay", "infobox", "pvm", "alert"}
 )
 @Slf4j
 public class UnpottedReminderPlugin extends Plugin
@@ -70,6 +72,14 @@ public class UnpottedReminderPlugin extends Plugin
 
 	@Inject
 	private OverlayManager overlayManager;
+
+	@Inject
+	private InfoBoxManager infoBoxManager;
+
+	@Inject
+	private ItemManager itemManager;
+
+	private UnpottedReminderInfoBox infoBox;
 
 	private Item[] playerItems;
 
@@ -100,7 +110,8 @@ public class UnpottedReminderPlugin extends Plugin
 			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1,
 			ItemID.STRENGTH_POTION4, ItemID.STRENGTH_POTION3,ItemID.STRENGTH_POTION2,ItemID.STRENGTH_POTION1,
 			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
-			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
+			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1,
+			ItemID.MOONLIGHT_POTION4, ItemID.MOONLIGHT_POTION3, ItemID.MOONLIGHT_POTION2, ItemID.MOONLIGHT_POTION1);
 
 	public static final List<Integer> ATTACK_POTIONS = List.of(
 			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
@@ -108,7 +119,8 @@ public class UnpottedReminderPlugin extends Plugin
 			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
 			ItemID.ATTACK_POTION4, ItemID.ATTACK_POTION3,ItemID.ATTACK_POTION2,ItemID.ATTACK_POTION1,
 			ItemID.SUPER_ATTACK4, ItemID.SUPER_ATTACK3, ItemID.SUPER_ATTACK2, ItemID.SUPER_ATTACK1,
-			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1);
+			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1,
+			ItemID.MOONLIGHT_POTION4, ItemID.MOONLIGHT_POTION3, ItemID.MOONLIGHT_POTION2, ItemID.MOONLIGHT_POTION1);
 
 	public static final List<Integer> STRENGTH_POTIONS = List.of(
 			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
@@ -116,7 +128,8 @@ public class UnpottedReminderPlugin extends Plugin
 			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
 			ItemID.STRENGTH_POTION4, ItemID.STRENGTH_POTION3,ItemID.STRENGTH_POTION2,ItemID.STRENGTH_POTION1,
 			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
-			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
+			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1,
+			ItemID.MOONLIGHT_POTION4, ItemID.MOONLIGHT_POTION3, ItemID.MOONLIGHT_POTION2, ItemID.MOONLIGHT_POTION1);
 
 	public static final List<Integer> RANGED_POTIONS = List.of(
 			ItemID.RANGING_POTION4, ItemID.RANGING_POTION3, ItemID.RANGING_POTION2, ItemID.RANGING_POTION1,
@@ -149,6 +162,8 @@ public class UnpottedReminderPlugin extends Plugin
 		blacklisted = splitList(config.blacklist());
 		whitelisted = splitList(config.whitelist());
 
+		infoBox = new UnpottedReminderInfoBox(itemManager.getImage(ItemID.VIAL), this, config);
+
 		clientThread.invoke(() ->
 		{
 			if (client.getGameState() == GameState.LOGGED_IN)
@@ -174,6 +189,7 @@ public class UnpottedReminderPlugin extends Plugin
 		alertStart = null;
 		playerExperience.clear();
 		overlayManager.remove(overlay);
+		infoBoxManager.removeInfoBox(infoBox);
 	}
 
 	@Subscribe
@@ -185,7 +201,18 @@ public class UnpottedReminderPlugin extends Plugin
 			whitelisted = splitList(config.whitelist());
 
 			if (!config.showOverlay())
+			{
 				overlayManager.remove(overlay);
+				infoBoxManager.removeInfoBox(infoBox);
+			}
+			else if (config.alertDisplayMode() == AlertDisplayMode.INFOBOX)
+			{
+				overlayManager.remove(overlay);
+			}
+			else
+			{
+				infoBoxManager.removeInfoBox(infoBox);
+			}
 		}
 	}
 
@@ -263,11 +290,23 @@ public class UnpottedReminderPlugin extends Plugin
 		alertStart = Instant.now();
 
 		if (config.showOverlay())
-			overlayManager.add(overlay);
+		{
+			if (config.alertDisplayMode() == AlertDisplayMode.INFOBOX)
+			{
+				if (!infoBoxManager.getInfoBoxes().contains(infoBox))
+				{
+					infoBoxManager.addInfoBox(infoBox);
+				}
+			}
+			else
+			{
+				overlayManager.add(overlay);
+			}
+		}
 
 		if (shouldNotify)
 		{
-			notifier.notify("You need to drink your boost potion!");
+			notifier.notify(config.alertMessage());
 			lastNotify = Instant.now();
 		}
 	}
@@ -275,6 +314,7 @@ public class UnpottedReminderPlugin extends Plugin
 	private void clearAlert()
 	{
 		overlayManager.remove(overlay);
+		infoBoxManager.removeInfoBox(infoBox);
 		alertStart = null;
 	}
 
