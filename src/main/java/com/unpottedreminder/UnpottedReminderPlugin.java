@@ -29,14 +29,17 @@ import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.*;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.util.Text;
 import net.runelite.client.util.WildcardMatcher;
 
@@ -48,7 +51,7 @@ import java.util.stream.Collectors;
 @PluginDescriptor(
 	name = "Unpotted Reminder",
 	description = "Reminds you you're unpotted in combat when you have one in your inventory",
-	tags = {"combat", "potion", "reminder", "overlay", "pvm", "alert"}
+	tags = {"combat", "potion", "reminder", "overlay", "infobox", "pvm", "alert"}
 )
 @Slf4j
 public class UnpottedReminderPlugin extends Plugin
@@ -71,6 +74,14 @@ public class UnpottedReminderPlugin extends Plugin
 	@Inject
 	private OverlayManager overlayManager;
 
+	@Inject
+	private InfoBoxManager infoBoxManager;
+
+	@Inject
+	private ItemManager itemManager;
+
+	private UnpottedReminderInfoBox infoBox;
+
 	private Item[] playerItems;
 
 	private List<String> blacklisted = new ArrayList<>();
@@ -80,6 +91,8 @@ public class UnpottedReminderPlugin extends Plugin
 	private Instant lastNotify;
 	private int potionLastDrankGameCycle;
 	
+	static final String DEFAULT_ALERT_MESSAGE = "Drink a boost potion!";
+
 	private static final int IMBUED_HEART_GRAPHIC = 1316;
 	private static final int SATURATED_HEART_GRAPHIC = 2287;
 
@@ -92,47 +105,54 @@ public class UnpottedReminderPlugin extends Plugin
 	private final List<Skill> trackedSkills = List.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.MAGIC);
 
 	public static final List<Integer> MELEE_POTIONS = List.of(
-			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
-			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
-			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
-			ItemID.ATTACK_POTION4, ItemID.ATTACK_POTION3,ItemID.ATTACK_POTION2,ItemID.ATTACK_POTION1,
-			ItemID.SUPER_ATTACK4, ItemID.SUPER_ATTACK3, ItemID.SUPER_ATTACK2, ItemID.SUPER_ATTACK1,
-			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1,
-			ItemID.STRENGTH_POTION4, ItemID.STRENGTH_POTION3,ItemID.STRENGTH_POTION2,ItemID.STRENGTH_POTION1,
-			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
-			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
+			ItemID._4DOSECOMBAT, ItemID._3DOSECOMBAT, ItemID._2DOSECOMBAT, ItemID._1DOSECOMBAT,
+			ItemID._4DOSE2COMBAT, ItemID._3DOSE2COMBAT, ItemID._2DOSE2COMBAT, ItemID._1DOSE2COMBAT,
+			ItemID._4DOSEDIVINECOMBAT, ItemID._3DOSEDIVINECOMBAT, ItemID._2DOSEDIVINECOMBAT, ItemID._1DOSEDIVINECOMBAT,
+			ItemID._4DOSE1ATTACK, ItemID._3DOSE1ATTACK, ItemID._2DOSE1ATTACK, ItemID._1DOSE1ATTACK,
+			ItemID._4DOSE2ATTACK, ItemID._3DOSE2ATTACK, ItemID._2DOSE2ATTACK, ItemID._1DOSE2ATTACK,
+			ItemID._4DOSEDIVINEATTACK, ItemID._3DOSEDIVINEATTACK, ItemID._2DOSEDIVINEATTACK, ItemID._1DOSEDIVINEATTACK,
+			ItemID.STRENGTH4, ItemID._3DOSE1STRENGTH, ItemID._2DOSE1STRENGTH, ItemID._1DOSE1STRENGTH,
+			ItemID._4DOSE2STRENGTH, ItemID._3DOSE2STRENGTH, ItemID._2DOSE2STRENGTH, ItemID._1DOSE2STRENGTH,
+			ItemID._4DOSEDIVINESTRENGTH, ItemID._3DOSEDIVINESTRENGTH, ItemID._2DOSEDIVINESTRENGTH, ItemID._1DOSEDIVINESTRENGTH,
+			ItemID._4DOSEMOONLIGHTPOTION, ItemID._3DOSEMOONLIGHTPOTION, ItemID._2DOSEMOONLIGHTPOTION, ItemID._1DOSEMOONLIGHTPOTION);
 
 	public static final List<Integer> ATTACK_POTIONS = List.of(
-			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
-			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
-			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
-			ItemID.ATTACK_POTION4, ItemID.ATTACK_POTION3,ItemID.ATTACK_POTION2,ItemID.ATTACK_POTION1,
-			ItemID.SUPER_ATTACK4, ItemID.SUPER_ATTACK3, ItemID.SUPER_ATTACK2, ItemID.SUPER_ATTACK1,
-			ItemID.DIVINE_SUPER_ATTACK_POTION4, ItemID.DIVINE_SUPER_ATTACK_POTION3, ItemID.DIVINE_SUPER_ATTACK_POTION2, ItemID.DIVINE_SUPER_ATTACK_POTION1);
+			ItemID._4DOSECOMBAT, ItemID._3DOSECOMBAT, ItemID._2DOSECOMBAT, ItemID._1DOSECOMBAT,
+			ItemID._4DOSE2COMBAT, ItemID._3DOSE2COMBAT, ItemID._2DOSE2COMBAT, ItemID._1DOSE2COMBAT,
+			ItemID._4DOSEDIVINECOMBAT, ItemID._3DOSEDIVINECOMBAT, ItemID._2DOSEDIVINECOMBAT, ItemID._1DOSEDIVINECOMBAT,
+			ItemID._4DOSE1ATTACK, ItemID._3DOSE1ATTACK, ItemID._2DOSE1ATTACK, ItemID._1DOSE1ATTACK,
+			ItemID._4DOSE2ATTACK, ItemID._3DOSE2ATTACK, ItemID._2DOSE2ATTACK, ItemID._1DOSE2ATTACK,
+			ItemID._4DOSEDIVINEATTACK, ItemID._3DOSEDIVINEATTACK, ItemID._2DOSEDIVINEATTACK, ItemID._1DOSEDIVINEATTACK,
+			ItemID._4DOSEMOONLIGHTPOTION, ItemID._3DOSEMOONLIGHTPOTION, ItemID._2DOSEMOONLIGHTPOTION, ItemID._1DOSEMOONLIGHTPOTION);
 
 	public static final List<Integer> STRENGTH_POTIONS = List.of(
-			ItemID.COMBAT_POTION4, ItemID.COMBAT_POTION3,ItemID.COMBAT_POTION2,ItemID.COMBAT_POTION1,
-			ItemID.SUPER_COMBAT_POTION4, ItemID.SUPER_COMBAT_POTION3, ItemID.SUPER_COMBAT_POTION2, ItemID.SUPER_COMBAT_POTION1,
-			ItemID.DIVINE_SUPER_COMBAT_POTION4, ItemID.DIVINE_SUPER_COMBAT_POTION3, ItemID.DIVINE_SUPER_COMBAT_POTION2, ItemID.DIVINE_SUPER_COMBAT_POTION1,
-			ItemID.STRENGTH_POTION4, ItemID.STRENGTH_POTION3,ItemID.STRENGTH_POTION2,ItemID.STRENGTH_POTION1,
-			ItemID.SUPER_STRENGTH4, ItemID.SUPER_STRENGTH3, ItemID.SUPER_STRENGTH2, ItemID.SUPER_STRENGTH1,
-			ItemID.DIVINE_SUPER_STRENGTH_POTION4, ItemID.DIVINE_SUPER_STRENGTH_POTION3, ItemID.DIVINE_SUPER_STRENGTH_POTION2, ItemID.DIVINE_SUPER_STRENGTH_POTION1);
+			ItemID._4DOSECOMBAT, ItemID._3DOSECOMBAT, ItemID._2DOSECOMBAT, ItemID._1DOSECOMBAT,
+			ItemID._4DOSE2COMBAT, ItemID._3DOSE2COMBAT, ItemID._2DOSE2COMBAT, ItemID._1DOSE2COMBAT,
+			ItemID._4DOSEDIVINECOMBAT, ItemID._3DOSEDIVINECOMBAT, ItemID._2DOSEDIVINECOMBAT, ItemID._1DOSEDIVINECOMBAT,
+			ItemID.STRENGTH4, ItemID._3DOSE1STRENGTH, ItemID._2DOSE1STRENGTH, ItemID._1DOSE1STRENGTH,
+			ItemID._4DOSE2STRENGTH, ItemID._3DOSE2STRENGTH, ItemID._2DOSE2STRENGTH, ItemID._1DOSE2STRENGTH,
+			ItemID._4DOSEDIVINESTRENGTH, ItemID._3DOSEDIVINESTRENGTH, ItemID._2DOSEDIVINESTRENGTH, ItemID._1DOSEDIVINESTRENGTH,
+			ItemID._4DOSEMOONLIGHTPOTION, ItemID._3DOSEMOONLIGHTPOTION, ItemID._2DOSEMOONLIGHTPOTION, ItemID._1DOSEMOONLIGHTPOTION);
 
 	public static final List<Integer> RANGED_POTIONS = List.of(
-			ItemID.RANGING_POTION4, ItemID.RANGING_POTION3, ItemID.RANGING_POTION2, ItemID.RANGING_POTION1,
-			ItemID.DIVINE_RANGING_POTION4, ItemID.DIVINE_RANGING_POTION3, ItemID.DIVINE_RANGING_POTION2, ItemID.DIVINE_RANGING_POTION1,
-			ItemID.BASTION_POTION4, ItemID.BASTION_POTION3, ItemID.BASTION_POTION2, ItemID.BASTION_POTION1,
-			ItemID.DIVINE_BASTION_POTION4, ItemID.DIVINE_BASTION_POTION3, ItemID.DIVINE_BASTION_POTION2, ItemID.DIVINE_BASTION_POTION1);
+			ItemID._4DOSERANGERSPOTION, ItemID._3DOSERANGERSPOTION, ItemID._2DOSERANGERSPOTION, ItemID._1DOSERANGERSPOTION,
+			ItemID._4DOSEDIVINERANGE, ItemID._3DOSEDIVINERANGE, ItemID._2DOSEDIVINERANGE, ItemID._1DOSEDIVINERANGE,
+			ItemID._4DOSEBASTION, ItemID._3DOSEBASTION, ItemID._2DOSEBASTION, ItemID._1DOSEBASTION,
+			ItemID._4DOSEDIVINEBASTION, ItemID._3DOSEDIVINEBASTION, ItemID._2DOSEDIVINEBASTION, ItemID._1DOSEDIVINEBASTION,
+			ItemID._4DOSEARMADYLBREW, ItemID._3DOSEARMADYLBREW, ItemID._2DOSEARMADYLBREW, ItemID._1DOSEARMADYLBREW);
 
 	public static final List<Integer> MAGIC_POTIONS = List.of(
-			ItemID.MAGIC_POTION4, ItemID.MAGIC_POTION3, ItemID.MAGIC_POTION4,
-			ItemID.BATTLEMAGE_POTION4, ItemID.BATTLEMAGE_POTION3, ItemID.BATTLEMAGE_POTION2, ItemID.BATTLEMAGE_POTION1,
-			ItemID.DIVINE_MAGIC_POTION4, ItemID.DIVINE_MAGIC_POTION3, ItemID.DIVINE_MAGIC_POTION2, ItemID.DIVINE_MAGIC_POTION1);
+			ItemID._4DOSE1MAGIC, ItemID._3DOSE1MAGIC, ItemID._2DOSE1MAGIC, ItemID._1DOSE1MAGIC,
+			ItemID._4DOSEBATTLEMAGE, ItemID._3DOSEBATTLEMAGE, ItemID._2DOSEBATTLEMAGE, ItemID._1DOSEBATTLEMAGE,
+			ItemID._4DOSEDIVINEMAGIC, ItemID._3DOSEDIVINEMAGIC, ItemID._2DOSEDIVINEMAGIC, ItemID._1DOSEDIVINEMAGIC,
+			ItemID._4DOSEDIVINEBATTLEMAGE, ItemID._3DOSEDIVINEBATTLEMAGE, ItemID._2DOSEDIVINEBATTLEMAGE, ItemID._1DOSEDIVINEBATTLEMAGE,
+			ItemID._4DOSEANCIENTBREW, ItemID._3DOSEANCIENTBREW, ItemID._2DOSEANCIENTBREW, ItemID._1DOSEANCIENTBREW,
+			ItemID._4DOSEFORGOTTENBREW, ItemID._3DOSEFORGOTTENBREW, ItemID._2DOSEFORGOTTENBREW, ItemID._1DOSEFORGOTTENBREW);
 
 	public static final List<Integer> OVERLOADS = List.of(
-			ItemID.SMELLING_SALTS_2, ItemID.SMELLING_SALTS_1,
-			ItemID.OVERLOAD_4, ItemID.OVERLOAD_3, ItemID.OVERLOAD_2, ItemID.OVERLOAD_1,
-			ItemID.OVERLOAD_4_20996, ItemID.OVERLOAD_3_20995, ItemID.OVERLOAD_2_20994, ItemID.OVERLOAD_1_20993);
+			ItemID.TOA_SUPPLY_STATS_2, ItemID.TOA_SUPPLY_STATS_1,
+			ItemID.NZONE4DOSEOVERLOADPOTION, ItemID.NZONE3DOSEOVERLOADPOTION, ItemID.NZONE2DOSEOVERLOADPOTION, ItemID.NZONE1DOSEOVERLOADPOTION,
+			ItemID.RAIDS_VIAL_OVERLOAD_STRONG_4, ItemID.RAIDS_VIAL_OVERLOAD_STRONG_3, ItemID.RAIDS_VIAL_OVERLOAD_STRONG_2, ItemID.RAIDS_VIAL_OVERLOAD_STRONG_1);
 
 	private final EnumMap<Skill, Integer> playerExperience = new EnumMap<>(Skill.class);
 	private final EnumMap<Skill, Integer> playerBoosts = new EnumMap<>(Skill.class);
@@ -148,6 +168,8 @@ public class UnpottedReminderPlugin extends Plugin
 	{
 		blacklisted = splitList(config.blacklist());
 		whitelisted = splitList(config.whitelist());
+
+		infoBox = new UnpottedReminderInfoBox(itemManager.getImage(ItemID.VIAL_EMPTY), this, config);
 
 		clientThread.invoke(() ->
 		{
@@ -174,6 +196,7 @@ public class UnpottedReminderPlugin extends Plugin
 		alertStart = null;
 		playerExperience.clear();
 		overlayManager.remove(overlay);
+		infoBoxManager.removeInfoBox(infoBox);
 	}
 
 	@Subscribe
@@ -185,7 +208,18 @@ public class UnpottedReminderPlugin extends Plugin
 			whitelisted = splitList(config.whitelist());
 
 			if (!config.showOverlay())
+			{
 				overlayManager.remove(overlay);
+				infoBoxManager.removeInfoBox(infoBox);
+			}
+			else if (config.alertDisplayMode() == AlertDisplayMode.INFOBOX)
+			{
+				overlayManager.remove(overlay);
+			}
+			else
+			{
+				infoBoxManager.removeInfoBox(infoBox);
+			}
 		}
 	}
 
@@ -263,18 +297,37 @@ public class UnpottedReminderPlugin extends Plugin
 		alertStart = Instant.now();
 
 		if (config.showOverlay())
-			overlayManager.add(overlay);
+		{
+			if (config.alertDisplayMode() == AlertDisplayMode.INFOBOX)
+			{
+				if (!infoBoxManager.getInfoBoxes().contains(infoBox))
+				{
+					infoBoxManager.addInfoBox(infoBox);
+				}
+			}
+			else
+			{
+				overlayManager.add(overlay);
+			}
+		}
 
 		if (shouldNotify)
 		{
-			notifier.notify("You need to drink your boost potion!");
+			notifier.notify(resolveAlertMessage(config));
 			lastNotify = Instant.now();
 		}
+	}
+
+	static String resolveAlertMessage(UnpottedReminderConfig config)
+	{
+		String message = config.alertMessage();
+		return message == null || message.trim().isEmpty() ? DEFAULT_ALERT_MESSAGE : message;
 	}
 
 	private void clearAlert()
 	{
 		overlayManager.remove(overlay);
+		infoBoxManager.removeInfoBox(infoBox);
 		alertStart = null;
 	}
 
